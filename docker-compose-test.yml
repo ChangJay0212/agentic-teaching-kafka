@@ -1,0 +1,113 @@
+version: '3.8'
+
+services:
+  # 原有的服務（保持不變）
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    hostname: zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    hostname: kafka
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "9101:9101"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:29092 --list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  agentic-app:
+    build: .
+    container_name: agentic-app
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      # Kafka configuration
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      
+      # Gemini API configuration
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-1.5-flash}
+      
+      # Cost calculation configuration
+      - GEMINI_INPUT_COST_PER_1K_TOKENS=${GEMINI_INPUT_COST_PER_1K_TOKENS:-0.000125}
+      - GEMINI_OUTPUT_COST_PER_1K_TOKENS=${GEMINI_OUTPUT_COST_PER_1K_TOKENS:-0.000375}
+      
+      # System configuration
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - REQUEST_TIMEOUT=${REQUEST_TIMEOUT:-30}
+      - PREFERRED_ENGINE=gemini
+      - PYTHONPATH=/app/src:/app
+    volumes:
+      - ./.env:/app/.env:ro
+      - ./logs:/app/logs
+      - .:/app
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'from src.core.kafka_client import KafkaClient; import sys; sys.exit(0 if KafkaClient().health_check() else 1)'"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+  # 新增：專用測試服務
+  test-runner:
+    build: .
+    container_name: test-runner
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - PYTHONPATH=/app/src:/app
+      - LOG_LEVEL=DEBUG
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: python test/test_docker_simple.py
+    profiles:
+      - testing
+
+  # 新增：互動式測試服務
+  test-interactive:
+    build: .
+    container_name: test-interactive
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - PYTHONPATH=/app/src:/app
+      - LOG_LEVEL=DEBUG
+    volumes:
+      - .:/app
+    working_dir: /app
+    stdin_open: true
+    tty: true
+    command: bash
+    profiles:
+      - testing

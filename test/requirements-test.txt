@@ -1,0 +1,12 @@
+# Test Requirements
+# Add any test-specific dependencies here
+
+# For mocking HTTP requests in Ollama tests
+responses>=0.23.0
+
+# For test coverage reporting (optional)
+coverage>=7.0.0
+
+# For test fixtures and utilities (optional)
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
