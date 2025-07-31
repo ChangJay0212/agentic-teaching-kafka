@@ -1,6 +1,7 @@
 # 🚀 Intelligent Teaching System V1
 
 A distributed AI teaching system based on Kafka, integrated with variety LLM engines.
+
 See the motivation and architecture diagram in the slides—view the PDF here: [View presentation](./agent-teach-introduce.pdf)
 ![](/docs/images/demo.gif)
 
