@@ -71,8 +71,21 @@ A distributed AI teaching system based on Kafka, integrated with variety LLM eng
 Before running, edit `docker-compose.yml` or `.env` to set up required parameters.
 
 ### 1. Kafka Configuration
-    
-    - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    # # Zookeeper (if separate service)
+    - KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+
+    # Broker settings
+    - KAFKA_BROKER_ID: 1
+    - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+
+    # Client endpoints
+    - KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+    - KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+
+    # Topic & group behavior
+    - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    - KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
 
 ### 2. Gemini Configuration
 > Get your [Gemini API Key](https://ai.google.dev/gemini-api/docs?hl=en) first.
